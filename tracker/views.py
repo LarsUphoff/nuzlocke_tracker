@@ -651,7 +651,11 @@ def tracker_view(request):
             form = EncounterForm(request.POST, instance=instance)
             if form.is_valid():
                 try:
-                    # Clear Pokemon data when status is verkackt or -
+                    if (form.cleaned_data.get("pokemon_species") and 
+                        form.cleaned_data.get("nickname") and 
+                        form.cleaned_data.get("status") == "-"):
+                        form.instance.status = "gefangen"
+                    
                     if form.cleaned_data["status"] in ["-", "verkackt"]:
                         form.instance.pokemon_species = None
                         form.instance.nickname = ""

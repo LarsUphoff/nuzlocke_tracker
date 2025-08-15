@@ -327,11 +327,34 @@ $(function() {
         var $input = $(this);
         var $form = $input.closest('form');
         var $speciesField = $form.find('input[name="pokemon_species"]');
+        var $nicknameField = $form.find('input[name="nickname"]');
+        var $statusSelect = $form.find('select[name="status"]');
+        
         if ($input.val() === '') {
             $speciesField.val('');
+        } else {
+            checkAndSetCaughtStatus($form);
         }
     });
-     $(".pokemon-autocomplete").each(function() {
+
+    function checkAndSetCaughtStatus($form) {
+        var $pokemonInput = $form.find('input[name="pokemon_name"]');
+        var $nicknameInput = $form.find('input[name="nickname"]');
+        var $statusSelect = $form.find('select[name="status"]');
+        
+        var pokemonName = $pokemonInput.val().trim();
+        var nickname = $nicknameInput.val().trim();
+        var currentStatus = $statusSelect.val();
+        
+        if (pokemonName && nickname && currentStatus === '-') {
+            $statusSelect.val('gefangen');
+            updateStatusIcon($statusSelect);
+            updateCollapsedStatusIcon($form, 'gefangen');
+            $statusSelect.trigger('change');
+        }
+    }
+
+    $(".pokemon-autocomplete").each(function() {
         var $input = $(this);
         var $form = $input.closest('form');
         var $speciesField = $form.find('input[name="pokemon_species"]');
@@ -372,6 +395,8 @@ $(function() {
         if ($field.hasClass('nickname-input')) {
             const $cell = $form.closest('td');
             $cell.find('.nickname-collapsed').text($field.val() || '');
+            
+            checkAndSetCaughtStatus($form);
         }
 
         saveTimeout = setTimeout(function() {
