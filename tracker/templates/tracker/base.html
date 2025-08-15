@@ -208,6 +208,32 @@
         .status-indicator i {
             font-size: 0.8rem;
         }
+        .player-header {
+            text-align: center;
+            min-width: 120px;
+        }
+        .player-name {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .player-types {
+            line-height: 1.2;
+            min-height: 20px;
+        }
+        .player-type-badge-small {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: normal;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+            .player-type-badge-small {
+                font-size: 0.6em !important;
+                padding: 1px 3px;
+            }
+        }
     </style>
 </head>
 <body>

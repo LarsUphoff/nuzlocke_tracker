@@ -218,12 +218,26 @@ def tracker_view(request):
                 and encounter.player in encounter_map[encounter.route]
             ):
                 encounter_map[encounter.route][encounter.player] = encounter
+        
+        player_types = PlayerType.objects.select_related("player").order_by(
+            "player__name", "order"
+        )
+        
+        german_type_map = get_german_type_names()
+        all_type_colors_de = {}
+        if german_type_map:
+            for en_name, de_name in german_type_map.items():
+                color = TYPE_COLORS_EN.get(en_name, "#68A090")
+                all_type_colors_de[de_name] = color
+        
         encounter_form = EncounterForm()
         context = {
             "players": players,
             "routes": routes,
             "encounter_map": encounter_map,
             "encounter_form": encounter_form,
+            "player_types": player_types,
+            "all_type_colors_de": all_type_colors_de,
             "active_tab": "tracker",
         }
         return render(request, "tracker/tracker.html", context)

@@ -1,4 +1,5 @@
 {% extends 'tracker/base.html' %}
+{% load tracker_extras %}
 
 {% block content %}
 
@@ -38,9 +39,27 @@
 <table class="table table-bordered table table-striped table-sm">
     <thead>
         <tr>
-            <th class="route-column">Route</th>
+            <th class="route-column align-middle">Route</th>
             {% for player in players %}
-            <th>{{ player.name }}</th>
+            <th>
+                <div class="player-header">
+                    <div class="player-name">{{ player.name }}</div>
+                    <div class="player-types mt-1">
+                        {% for pt in player_types %}
+                            {% if pt.player_id == player.id %}
+                                <span class="badge player-type-badge-small me-1" 
+                                      style="background-color: {{ all_type_colors_de|get_item:pt.type_name }}; color: #fff; font-size: 0.7em;">
+                                    {{ pt.type_name }}
+                                </span>
+                            {% endif %}
+                        {% empty %}
+                            {% if forloop.parentloop.first %}
+                                <span class="text-muted" style="font-size: 0.7em; font-style: italic;">Keine Typen</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </th>
             {% endfor %}
         </tr>
     </thead>
