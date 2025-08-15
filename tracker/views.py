@@ -318,8 +318,13 @@ def tracker_view(request):
                 encounters = Encounter.objects.select_related(
                     "player", "route", "pokemon_species"
                 ).all()
+                player_types = PlayerType.objects.select_related("player").all()
 
-                export_data = []
+                export_data = {
+                    "encounters": [],
+                    "player_types": []
+                }
+                
                 for encounter in encounters:
                     encounter_data = {
                         "player_name": encounter.player.name,
@@ -330,7 +335,15 @@ def tracker_view(request):
                         if encounter.pokemon_species
                         else None,
                     }
-                    export_data.append(encounter_data)
+                    export_data["encounters"].append(encounter_data)
+
+                for player_type in player_types:
+                    type_data = {
+                        "player_name": player_type.player.name,
+                        "type_name": player_type.type_name,
+                        "order": player_type.order,
+                    }
+                    export_data["player_types"].append(type_data)
 
                 return JsonResponse({"status": "success", "data": export_data})
             except Exception as e:
@@ -348,25 +361,30 @@ def tracker_view(request):
                 return HttpResponseNotAllowed(["POST"])
 
             try:
-                import_data = json.loads(request.POST.get("import_data", "[]"))
+                import_data = json.loads(request.POST.get("import_data", "{}"))
                 if not import_data:
                     return JsonResponse(
                         {"status": "error", "message": "Keine Daten zum Importieren."},
                         status=400,
                     )
 
-                with transaction.atomic():
-                    success_count = 0
-                    error_count = 0
+                encounters_data = import_data if isinstance(import_data, list) else import_data.get("encounters", [])
+                player_types_data = import_data.get("player_types", []) if isinstance(import_data, dict) else []
 
-                    for item in import_data:
+                with transaction.atomic():
+                    encounter_success_count = 0
+                    encounter_error_count = 0
+                    type_success_count = 0
+                    type_error_count = 0
+
+                    for item in encounters_data:
                         try:
                             player_name = item.get("player_name")
                             route_name = item.get("route_name")
                             pokemon_name = item.get("pokemon_name")
 
                             if not player_name or not route_name:
-                                error_count += 1
+                                encounter_error_count += 1
                                 continue
 
                             player, _ = Player.objects.get_or_create(name=player_name)
@@ -374,7 +392,7 @@ def tracker_view(request):
                             try:
                                 route = Route.objects.get(name=route_name)
                             except Route.DoesNotExist:
-                                error_count += 1
+                                encounter_error_count += 1
                                 continue
 
                             pokemon_species = None
@@ -402,16 +420,55 @@ def tracker_view(request):
                                 },
                             )
 
-                            success_count += 1
+                            encounter_success_count += 1
 
                         except Exception as e:
-                            print(f"Error importing item {item}: {e}")
-                            error_count += 1
+                            print(f"Error importing encounter {item}: {e}")
+                            encounter_error_count += 1
+
+                    for item in player_types_data:
+                        try:
+                            player_name = item.get("player_name")
+                            type_name = item.get("type_name")
+                            order = item.get("order", 0)
+
+                            if not player_name or not type_name:
+                                type_error_count += 1
+                                continue
+
+                            player, _ = Player.objects.get_or_create(name=player_name)
+
+                            existing_assignment = PlayerType.objects.filter(type_name=type_name).first()
+                            if existing_assignment:
+                                existing_assignment.delete()
+
+                            PlayerType.objects.create(
+                                player=player,
+                                type_name=type_name,
+                                order=order
+                            )
+
+                            type_success_count += 1
+
+                        except Exception as e:
+                            print(f"Error importing player type {item}: {e}")
+                            type_error_count += 1
+
+                    message_parts = []
+                    if encounter_success_count > 0 or encounter_error_count > 0:
+                        message_parts.append(f"{encounter_success_count} Encounters erfolgreich importiert")
+                        if encounter_error_count > 0:
+                            message_parts.append(f"{encounter_error_count} Encounter-Fehler")
+                    
+                    if type_success_count > 0 or type_error_count > 0:
+                        message_parts.append(f"{type_success_count} Typenzuweisungen erfolgreich importiert")
+                        if type_error_count > 0:
+                            message_parts.append(f"{type_error_count} Typen-Fehler")
 
                     return JsonResponse(
                         {
                             "status": "success",
-                            "message": f"{success_count} Encounters erfolgreich importiert. {error_count} Fehler.",
+                            "message": ". ".join(message_parts) + ".",
                         }
                     )
 
