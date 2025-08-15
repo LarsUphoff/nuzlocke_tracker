@@ -1,0 +1,484 @@
+{% extends 'tracker/base.html' %}
+{% load tracker_extras %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Glücksrad</h2>
+        <div>
+            <button id="reset-wheel-btn" class="btn btn-outline-danger rounded-pill me-2">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Rad zurücksetzen
+            </button>
+            <a href="{% url 'player_types_view' %}" class="btn btn-outline-primary rounded-pill">
+                <i class="bi bi-grid-3x3-gap me-1"></i> Zur Typenverwaltung
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="text-center">
+                <div id="wheel-container" class="position-relative d-inline-block">
+                    <canvas id="wheel-canvas" width="400" height="400"></canvas>
+                    <div id="wheel-pointer" class="position-absolute"></div>
+                </div>
+                <div class="mt-3">
+                    <button id="spin-btn" class="btn btn-primary btn-lg rounded-pill" {% if not available_types %}disabled{% endif %}>
+                        <i class="bi bi-arrow-repeat me-2"></i> Rad drehen!
+                    </button>
+                </div>
+                <div id="result-display" class="mt-3 alert alert-info" style="display: none;">
+                    <h4 id="result-text"></h4>
+                </div>
+                
+                <div id="wheel-messages" class="mt-3"></div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <h4>Spieler auswählen</h4>
+            <div class="list-group">
+                {% for player in players %}
+                <button class="list-group-item list-group-item-action player-select-btn" 
+                        data-player-id="{{ player.id }}" 
+                        data-player-name="{{ player.name }}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>{{ player.name }}</span>
+                        <span class="badge bg-secondary">
+                            {{ player.type_count }} Typen
+                        </span>
+                    </div>
+                </button>
+                {% endfor %}
+            </div>
+            
+            <div id="selected-player-info" class="mt-3 alert alert-success" style="display: none;">
+                <h5 id="selected-player-name"></h5>
+                <p class="mb-0">Ausgewählt für Typenzuweisung</p>
+            </div>
+
+            <div class="mt-4">
+                <h5>Zugewiesene Typen</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Spieler</th>
+                                <th>Typen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="type-assignment-table">
+                            {% for player in players %}
+                            <tr data-player-id="{{ player.id }}">
+                                <td class="fw-bold">{{ player.name }}</td>
+                                <td class="player-types-cell">
+                                    {% for pt in player_types %}
+                                        {% if pt.player_id == player.id %}
+                                            <span class="badge me-1 mb-1 player-type-badge" 
+                                                  data-type-name="{{ pt.type_name }}"
+                                                  style="background-color: {{ all_type_colors_de|get_item:pt.type_name }}; color: #fff;">
+                                                {{ pt.type_name }}
+                                            </span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <span class="no-types-text {% if player.type_count > 0 %}d-none{% endif %} text-muted fst-italic">
+                                        Keine Typen zugewiesen
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="assignmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Typ zuweisen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="modal-type-display" class="mb-3"></div>
+                <p>Möchtest du <strong id="modal-type-name"></strong> dem Spieler <strong id="modal-player-name"></strong> zuweisen?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" id="confirm-assignment-btn" class="btn btn-primary">Zuweisen</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(function() {
+    const availableTypes = {{ available_types|safe }};
+    const typeColors = {{ type_colors|safe }};
+    let selectedPlayerId = null;
+    let selectedPlayerName = null;
+    let currentResult = null;
+    let isSpinning = false;
+
+    const canvas = document.getElementById('wheel-canvas');
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 180;
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function drawWheel(rotation = 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (availableTypes.length === 0) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fill();
+            ctx.strokeStyle = '#dee2e6';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#6c757d';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Keine Typen verfügbar', centerX, centerY);
+            return;
+        }
+
+        const angleStep = (2 * Math.PI) / availableTypes.length;
+        
+        availableTypes.forEach((type, index) => {
+            const startAngle = rotation + index * angleStep;
+            const endAngle = rotation + (index + 1) * angleStep;
+            
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.closePath();
+            ctx.fillStyle = typeColors[type] || '#68A090';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            const textAngle = startAngle + angleStep / 2;
+            const textX = centerX + Math.cos(textAngle) * (radius * 0.7);
+            const textY = centerY + Math.sin(textAngle) * (radius * 0.7);
+            
+            ctx.save();
+            ctx.translate(textX, textY);
+            ctx.rotate(textAngle + Math.PI / 2);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 2;
+            ctx.fillText(type, 0, 0);
+            ctx.restore();
+        });
+    }
+
+    function getSelectedType(rotation) {
+        if (availableTypes.length === 0) return null;
+        
+        const normalizedRotation = ((rotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+        const pointerAngle = 3 * Math.PI / 2;
+        const adjustedAngle = (pointerAngle - normalizedRotation + (2 * Math.PI)) % (2 * Math.PI);
+        const segmentIndex = Math.floor(adjustedAngle / ((2 * Math.PI) / availableTypes.length));
+        
+        const validIndex = Math.max(0, Math.min(segmentIndex, availableTypes.length - 1));
+        return availableTypes[validIndex];
+    }
+
+    function spinWheel() {
+        if (isSpinning || availableTypes.length === 0) return;
+        
+        isSpinning = true;
+        $('#spin-btn').prop('disabled', true).html('<i class="bi bi-arrow-repeat me-2"></i> Dreht...');
+        $('#result-display').hide();
+        
+        const spinDuration = 3000;
+        const minSpins = 5;
+        const maxSpins = 8;
+        const totalRotation = (minSpins + Math.random() * (maxSpins - minSpins)) * 2 * Math.PI;
+        
+        let startTime = null;
+        let startRotation = 0;
+        
+        function animate(currentTime) {
+            if (!startTime) startTime = currentTime;
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / spinDuration, 1);
+            
+            const easeOut = 1 - Math.pow(1 - progress, 3);
+            const currentRotation = startRotation + totalRotation * easeOut;
+            
+            drawWheel(currentRotation);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                currentResult = getSelectedType(currentRotation);
+                showResult();
+                isSpinning = false;
+                $('#spin-btn').prop('disabled', false).html('<i class="bi bi-arrow-repeat me-2"></i> Rad drehen!');
+            }
+        }
+        
+        requestAnimationFrame(animate);
+    }
+
+    function showResult() {
+        if (!currentResult) return;
+        
+        $('#result-text').text(`Ergebnis: ${currentResult}`);
+        $('#result-display').show();
+        
+        if (selectedPlayerId && selectedPlayerName) {
+            showAssignmentModal();
+        }
+    }
+
+    function showAssignmentModal() {
+        if (!currentResult || !selectedPlayerId) return;
+        
+        const color = typeColors[currentResult] || '#68A090';
+        $('#modal-type-display').html(`
+            <div class="d-inline-block px-3 py-2 rounded" style="background-color: ${color}; color: #fff; text-shadow: 1px 1px 1px #000; font-weight: bold; font-size: 1.2em;">
+                ${currentResult}
+            </div>
+        `);
+        $('#modal-type-name').text(currentResult);
+        $('#modal-player-name').text(selectedPlayerName);
+        
+        new bootstrap.Modal(document.getElementById('assignmentModal')).show();
+    }
+
+    $('.player-select-btn').on('click', function() {
+        $('.player-select-btn').removeClass('active');
+        $(this).addClass('active');
+        
+        selectedPlayerId = $(this).data('playerId');
+        selectedPlayerName = $(this).data('playerName');
+        
+        $('#selected-player-name').text(selectedPlayerName);
+        $('#selected-player-info').show();
+    });
+
+    function updatePlayerTypeCount(playerId, increment = true) {
+        const $playerBtn = $(`.player-select-btn[data-player-id="${playerId}"]`);
+        const $badge = $playerBtn.find('.badge');
+        let currentCount = parseInt($badge.text()) || 0;
+        
+        if (increment) {
+            currentCount += 1;
+        } else {
+            currentCount = Math.max(0, currentCount - 1);
+        }
+        
+        $badge.text(`${currentCount} Typen`);
+    }
+
+    function updateTypeAssignmentTable(playerId, typeName, typeColor, isAdding = true) {
+        const $row = $(`#type-assignment-table tr[data-player-id="${playerId}"]`);
+        const $typesCell = $row.find('.player-types-cell');
+        const $noTypesText = $typesCell.find('.no-types-text');
+        
+        if (isAdding) {
+            const $newBadge = $(`
+                <span class="badge me-1 mb-1 player-type-badge" 
+                      data-type-name="${typeName}"
+                      style="background-color: ${typeColor}; color: #fff;">
+                    ${typeName}
+                </span>
+            `);
+            
+            $newBadge.insertBefore($noTypesText);
+            
+            $noTypesText.addClass('d-none');
+            
+        } else {
+            $typesCell.find(`.player-type-badge[data-type-name="${typeName}"]`).remove();
+            
+            if ($typesCell.find('.player-type-badge').length === 0) {
+                $noTypesText.removeClass('d-none');
+            }
+        }
+    }
+
+    function removeTypeFromTable(playerId, typeName) {
+        updateTypeAssignmentTable(playerId, typeName, '', false);
+    }
+
+    $('#spin-btn').on('click', spinWheel);
+
+    function showWheelMessage(message, type = 'success') {
+        $('#wheel-messages').empty();
+        
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const icon = type === 'success' ? 'check-circle' : 'exclamation-triangle';
+        
+        const alert = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="bi bi-${icon} me-2"></i><strong>${type === 'success' ? 'Erfolg!' : 'Fehler!'}</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('#wheel-messages').append(alert);
+        
+        setTimeout(() => {
+            if (alert.length && alert.hasClass('show')) {
+                alert.alert('close');
+            }
+        }, 4000);
+    }
+
+    $('#confirm-assignment-btn').on('click', function() {
+        if (!currentResult || !selectedPlayerId) {
+            showWheelMessage('Kein Typ oder Spieler ausgewählt.', 'error');
+            return;
+        }
+        
+        const $button = $(this);
+        $button.prop('disabled', true).text('Zuweisen...');
+        
+        $.ajax({
+            url: "{% url 'player_types_view' %}",
+            type: 'POST',
+            data: {
+                'action': 'assign_type',
+                'player_id': selectedPlayerId,
+                'type_name': currentResult,
+                'csrfmiddlewaretoken': csrftoken
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    const typeIndex = availableTypes.indexOf(currentResult);
+                    if (typeIndex > -1) {
+                        availableTypes.splice(typeIndex, 1);
+                        delete typeColors[currentResult];
+                    }
+                    
+                    updatePlayerTypeCount(selectedPlayerId, true);
+                    
+                    const currentTypeColor = typeColors[currentResult] || '#68A090';
+                    updateTypeAssignmentTable(selectedPlayerId, currentResult, currentTypeColor, true);
+                    
+                    if (response.removed_from_player_id) {
+                        updatePlayerTypeCount(response.removed_from_player_id, false);
+                        removeTypeFromTable(response.removed_from_player_id, currentResult);
+                    }
+                    
+                    drawWheel();
+                    
+                    bootstrap.Modal.getInstance(document.getElementById('assignmentModal')).hide();
+                    $('#result-display').hide();
+                    
+                    showWheelMessage(`${currentResult} wurde ${selectedPlayerName} zugewiesen.`);
+                    
+                    currentResult = null;
+                    
+                    if (availableTypes.length === 0) {
+                        $('#spin-btn').prop('disabled', true).html('<i class="bi bi-x-circle me-2"></i> Keine Typen verfügbar');
+                    }
+                    
+                } else {
+                    showWheelMessage(response.message || 'Unbekannter Fehler beim Zuweisen.', 'error');
+                }
+            },
+            error: function() {
+                showWheelMessage('Serverfehler beim Zuweisen des Typs.', 'error');
+            },
+            complete: function() {
+                $button.prop('disabled', false).text('Zuweisen');
+            }
+        });
+    });
+
+    $('#reset-wheel-btn').on('click', function() {
+        if (confirm('Soll das Glücksrad zurückgesetzt werden? Alle Typenzuweisungen werden entfernt.')) {
+            $.ajax({
+                url: "{% url 'player_types_view' %}",
+                type: 'POST',
+                data: {
+                    'action': 'reset_all_types',
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('.player-select-btn .badge').text('0 Typen');
+                        
+                        $('#type-assignment-table .player-type-badge').remove();
+                        $('#type-assignment-table .no-types-text').removeClass('d-none');
+                        
+                        showWheelMessage('Alle Typenzuweisungen wurden zurückgesetzt.');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showWheelMessage(response.message || 'Fehler beim Zurücksetzen.', 'error');
+                    }
+                },
+                error: function() {
+                    showWheelMessage('Serverfehler beim Zurücksetzen.', 'error');
+                }
+            });
+        }
+    });
+
+    drawWheel();
+});
+</script>
+<style>
+#wheel-container {
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+
+#wheel-pointer {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-top: 25px solid #dc3545;
+    z-index: 10;
+}
+
+.player-select-btn.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+#wheel-canvas {
+    border-radius: 50%;
+    background-color: #fff;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between mb-4 align-items-center">
+    <h2>Bosse</h2>
+    <button id="clear-completed-bosses" class="btn btn-outline-danger rounded-pill">
+        <i class="bi bi-trash me-1"></i> Bosse zurücksetzen
+    </button>
+</div>
+
+<table class="table table-striped table-sm" id="boss-table">
+    <thead class="table-light">
+        <tr>
+            <th scope="col">Boss</th>
+            <th scope="col">Ort</th>
+            <th scope="col">Anzahl Pokemon</th>
+            <th scope="col">Level Cap</th>
+            <th scope="col" class="text-center">Erledigt</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% regroup bosses by region as region_list %}
+        {% for region_group in region_list %}
+            <tr class="table-group-divider">
+                <td colspan="6" class="table-secondary text-center fw-bold">{{ region_group.grouper }}</td>
+            </tr>
+            {% for boss in region_group.list %}
+                <tr data-boss-id="{{ region_group.grouper }}-{{ boss.num }}" class="boss-row" style="cursor: pointer;">
+                    <th scope="row">{{ boss.name }}</th>
+                    <td>{{ boss.location }}</td>
+                    <td>{{ boss.number_of_pokemon }}</td>
+                    <td>{{ boss.level_cap }}</td>
+                    <td class="text-center">
+                        <div class="form-check d-flex justify-content-center">
+                            <input class="form-check-input boss-completion-checkbox" type="checkbox" 
+                                   id="boss-{{ region_group.grouper }}-{{ boss.num }}">
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">Keine Boss-Daten verfügbar.</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        function loadBossCompletionStatus() {
+            const savedStatus = localStorage.getItem('bossCompletionStatus');
+            if (savedStatus) {
+                const completedBosses = JSON.parse(savedStatus);
+                completedBosses.forEach(bossId => {
+                    const checkbox = $(`#boss-${bossId}`);
+                    if (checkbox.length) {
+                        checkbox.prop('checked', true);
+                        updateRowAppearance(bossId, true);
+                    }
+                });
+            }
+        }
+        function updateRowAppearance(bossId, isCompleted) {
+            const row = $(`tr[data-boss-id="${bossId}"]`);
+            if (isCompleted) {
+                row.addClass('table-success');
+                row.find('td').css('text-decoration', 'line-through');
+            } else {
+                row.removeClass('table-success');
+                row.find('td').css('text-decoration', 'none');
+            }
+        }
+        function saveBossCompletionStatus() {
+            const completedBosses = [];
+            $('.boss-completion-checkbox:checked').each(function() {
+                const bossId = $(this).attr('id').replace('boss-', '');
+                completedBosses.push(bossId);
+            });
+            localStorage.setItem('bossCompletionStatus', JSON.stringify(completedBosses));
+        }
+        $(document).on('change', '.boss-completion-checkbox', function() {
+            const bossId = $(this).attr('id').replace('boss-', '');
+            const isCompleted = $(this).prop('checked');
+            updateRowAppearance(bossId, isCompleted);
+            saveBossCompletionStatus();
+        });
+        $(document).on('click', '.boss-row', function() {
+            const checkbox = $(this).find('.boss-completion-checkbox');
+            const currentState = checkbox.prop('checked');
+            checkbox.prop('checked', !currentState);
+            checkbox.trigger('change');
+        });
+        $(document).on('click', '.boss-completion-checkbox', function(e) {
+            e.stopPropagation();
+        });
+        $('#clear-completed-bosses').on('click', function() {
+            if (confirm('Möchtest du wirklich alle Bosse zurücksetzen?')) {
+                $('.boss-completion-checkbox').prop('checked', false);
+                $('.boss-row').removeClass('table-success');
+                $('.boss-row td').css('text-decoration', 'none');
+                localStorage.removeItem('bossCompletionStatus');
+            }
+        });
+        loadBossCompletionStatus();
+    });
+</script>
+{% endblock %}

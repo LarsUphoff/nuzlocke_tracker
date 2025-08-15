@@ -1,0 +1,64 @@
+{% extends 'tracker/base.html' %} {% block content %}
+<h2 class="mb-4">Nuzlocke Regeln</h2>
+
+<h3 class="mb-3">Standard Regeln</h3>
+<ul>
+    <li>
+        Jedes Pokémon, das besiegt wird, gilt als tot und muss freigelassen oder
+        permanent in einer 'Todesbox' gelagert werden.
+    </li>
+    <li>
+        Nur das erste wilde Pokémon, dem man in einem Gebiet (Route,
+        Höhle, etc.) begegnet, darf gefangen werden. Schlägt der Fangversuch fehl oder flieht das
+        Pokémon, gibt es für dieses Gebiet keine zweite Chance.
+    </li>
+    <li>
+        Allen gefangenen Pokémon müssen Spitznamen gegeben werden.
+    </li>
+    <li>
+        Ein 'White Out' (alle Pokémon im Team sind besiegt) bedeutet 'Game Over'.
+    </li>
+</ul>
+
+<h3 class="mb-3">Soul Link Regeln</h3>
+<ul>
+    <li>
+        Die Begegnungen der Spieler in einem Gebiet sind miteinander verknüpft. Wenn
+        ein Spieler seinen Encounter nicht fängt, muss auch der andere seinen
+        Encounter freilassen oder boxen. Gelingt der Fang beiden, gelten die Pokémon
+        als Partner.
+    </li>
+    <li>
+        Wenn ein Pokémon eines Spielers besiegt wird, muss das verknüpfte
+        Partner-Pokémon des anderen Spielers ebenfalls freigelassen oder in die Box
+        gelegt werden.
+    </li>
+</ul>
+
+<h3 class="mb-3">Hausregeln (Optional)</h3>
+<ul>
+    <li>
+        Einmal pro LAN darf ein Pokémon wiederbelebt werden,
+        allerdings muss dafür ein anderes Pokémon geopfert werden.
+    </li>
+    <li>
+        Jeder Trainerkampf muss absolviert werden. Um übermäßiges Grinden gegen
+        wilde Pokémon zu vermeiden, darf das Level der eigenen Pokémon manipuliert
+        werden.
+    </li>
+    <li>
+        Jeder Spieler darf nur Pokémon bestimmter Typen sammeln (z. B. Spieler 1: Wasser,
+        Feuer, Pflanze, Geist). Andere dürfen diese Typen nicht im Kampf verwenden.
+        Getauscht werden darf nur innerhalb dieser Typregeln. Die ersten drei Encounter definieren die ersten drei Typen. Die nächsten drei Encounter werden durch ein Glücksrad bestimmt.
+    </li>
+    <li>
+        In Trainerkämpfen dürfen nur dann Items eingesetzt werden, wenn der
+        gegnerische Trainer ebenfalls Items verwendet. Frisst ein Pokemon eine Beere, gilt das nicht als Item.
+    </li>
+    <li>
+        In Arenakämpfen darf das am höchsten gelevelte eigene Pokémon maximal zwei
+        Level über dem stärksten gegnerischen Pokémon liegen.
+    </li>
+</ul>
+
+{% endblock %}

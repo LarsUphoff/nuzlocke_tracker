@@ -1,0 +1,252 @@
+{% extends 'tracker/base.html' %}
+{% load tracker_extras %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Spieler-Typen Zuweisung</h2>
+        <div>
+            <a href="{% url 'type_wheel_view' %}" class="btn btn-outline-success rounded-pill me-2">
+                <i class="bi bi-arrow-repeat me-1"></i> Glücksrad
+            </a>
+            <button id="reset-all-types-btn" class="btn btn-outline-danger rounded-pill">
+                <i class="bi bi-trash me-1"></i> Alle Typen zurücksetzen
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <h4>Alle Typen</h4>
+            <div id="all-types-container" class="list-group type-list">
+                {% for type_name, color in type_colors_de.items %}
+                    <div class="list-group-item type-tile" data-type-name="{{ type_name }}" style="background-color: {{ color }}; color: #fff; text-shadow: 1px 1px 1px #000; cursor: grab;">
+                        {{ type_name }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% for player in players %}
+        <div class="col-md-3">
+            <h4>{{ player.name }}</h4>
+            <div id="player-types-{{ player.id }}" class="list-group player-type-list type-list" data-player-id="{{ player.id }}">
+                {% for pt in player_types %}
+                    {% if pt.player_id == player.id %}
+                        <div class="list-group-item type-tile" data-type-name="{{ pt.type_name }}" data-assignment-id="{{ pt.id }}" style="background-color: {{ all_type_colors_de|get_item:pt.type_name }}; color: #fff; text-shadow: 1px 1px 1px #000; cursor: grab;">
+                            {{ pt.type_name }}
+                            <button class="btn btn-sm btn-danger remove-type-btn float-end" data-assignment-id="{{ pt.id }}" style="padding: 0.1rem 0.3rem; line-height: 1;">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script>
+$(function() {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    new Sortable(document.getElementById('all-types-container'), {
+        group: {
+            name: 'shared',
+            pull: 'clone',
+            put: false
+        },
+        animation: 150,
+        sort: false
+    });
+
+    $('.player-type-list').each(function() {
+        new Sortable(this, {
+            group: 'shared',
+            animation: 150,
+            onAdd: function (evt) {
+                const itemEl = evt.item;
+                const typeName = $(itemEl).data('typeName');
+                const playerId = $(evt.to).data('playerId');
+                let typeExists = false;
+                $(evt.to).find('.type-tile').not(itemEl).each(function() {
+                    if ($(this).data('typeName') === typeName) {
+                        typeExists = true;
+                    }
+                });
+                if (typeExists) {
+                    $(itemEl).remove();
+                    alert(typeName + ' ist bereits diesem Spieler zugewiesen.');
+                    return;
+                }
+                if (!$(itemEl).find('.remove-type-btn').length) {
+                    $(itemEl).append('<button class="btn btn-sm btn-danger remove-type-btn float-end" style="padding: 0.1rem 0.3rem; line-height: 1;"><i class="bi bi-x"></i></button>');
+                }
+                $.ajax({
+                    url: "{% url 'player_types_view' %}",
+                    type: 'POST',
+                    data: {
+                        'action': 'assign_type',
+                        'player_id': playerId,
+                        'type_name': typeName,
+                        'csrfmiddlewaretoken': csrftoken
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            $(itemEl).data('assignmentId', response.assignment_id);
+                            $(itemEl).attr('data-assignment-id', response.assignment_id);
+                            $(itemEl).find('.remove-type-btn').data('assignmentId', response.assignment_id);
+                            $(itemEl).find('.remove-type-btn').attr('data-assignment-id', response.assignment_id);
+                            $('#all-types-container').find('.type-tile').each(function() {
+                                if ($(this).data('typeName') === typeName) {
+                                    $(this).fadeOut(300, function() { $(this).remove(); });
+                                }
+                            });
+                            if (response.removed_from_player_id) {
+                                $('#player-types-' + response.removed_from_player_id).find('.type-tile').each(function() {
+                                    if ($(this).data('typeName') === typeName) {
+                                        $(this).fadeOut(300, function() { $(this).remove(); });
+                                    }
+                                });
+                            }
+                        } else {
+                            alert('Fehler beim Zuweisen: ' + response.message);
+                            $(itemEl).remove();
+                        }
+                    },
+                    error: function() {
+                        alert('Serverfehler beim Zuweisen des Typs.');
+                        $(itemEl).remove();
+                    }
+                });
+            },
+            onRemove: function (evt) {
+            }
+        });
+    });
+
+    $(document).on('click', '.remove-type-btn', function() {
+        const $button = $(this);
+        const assignmentId = $button.data('assignmentId') || $button.attr('data-assignment-id');
+        const $tileToRemove = $button.closest('.type-tile');
+        const typeName = $tileToRemove.data('typeName');
+        if (!assignmentId) {
+            $tileToRemove.remove();
+            return;
+        }
+        $.ajax({
+            url: "{% url 'player_types_view' %}",
+            type: 'POST',
+            data: {
+                'action': 'remove_type',
+                'assignment_id': assignmentId,
+                'csrfmiddlewaretoken': csrftoken
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    $tileToRemove.fadeOut(300, function() { 
+                        $(this).remove(); 
+                        const typeColor = "{{ all_type_colors_de|safe }}";
+                        const allTypeColors = JSON.parse(typeColor.replace(/'/g, '"'));
+                        const color = allTypeColors[typeName] || '#68A090';
+                        const newTypeTile = $('<div class="list-group-item type-tile" data-type-name="' + typeName + '" style="background-color: ' + color + '; color: #fff; text-shadow: 1px 1px 1px #000; cursor: grab;">' + typeName + '</div>');
+                        let inserted = false;
+                        $('#all-types-container .type-tile').each(function() {
+                            if ($(this).data('typeName') > typeName) {
+                                newTypeTile.insertBefore($(this));
+                                inserted = true;
+                                return false;
+                            }
+                        });
+                        if (!inserted) {
+                            $('#all-types-container').append(newTypeTile);
+                        }
+                        newTypeTile.hide().fadeIn(300);
+                    });
+                } else {
+                    alert('Fehler beim Entfernen: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('Serverfehler beim Entfernen des Typs.');
+            }
+        });
+    });
+
+    $('#reset-all-types-btn').on('click', function() {
+        if (confirm('Sollen wirklich alle zugewiesenen Typen für alle Spieler zurückgesetzt werden?')) {
+            $.ajax({
+                url: "{% url 'player_types_view' %}",
+                type: 'POST',
+                data: {
+                    'action': 'reset_all_types',
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('.player-type-list .type-tile').fadeOut(300, function() { $(this).remove(); });
+                        setTimeout(function() {
+                            location.reload();
+                        }, 500);
+                    } else {
+                        alert('Fehler beim Zurücksetzen aller Typen: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Serverfehler beim Zurücksetzen aller Typen.');
+                }
+            });
+        }
+    });
+});
+</script>
+<style>
+.type-list {
+    min-height: 100px;
+    border: 1px dashed #ccc;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+.type-tile {
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+.type-tile .remove-type-btn {
+    opacity: 0.7;
+}
+.type-tile:hover .remove-type-btn {
+    opacity: 1;
+}
+.sortable-ghost {
+  opacity: 0.4;
+  background-color: #c8ebfb;
+}
+.sortable-chosen {
+  cursor: grabbing !important;
+}
+</style>
+{% endblock %}

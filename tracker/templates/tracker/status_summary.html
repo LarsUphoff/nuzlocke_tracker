@@ -1,0 +1,39 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+<h2 class="mb-4">Status: Tot / Gefangen</h2>
+
+<div class="row">
+    {% for player, statuses in summary.items %}
+        <div class="col-md-4">
+            <h3 class="mb-3">{{ player.name }}</h3>
+
+            <h4 class="mb-2">Gefangen ({{ statuses.lebendig|length }})</h4>
+            <ul class="list-group mb-3">
+                {% for encounter in statuses.lebendig %}
+                    <li class="list-group-item">
+                        {{ encounter.nickname|default:encounter.pokemon_species.name|capfirst }}
+                        ({{ encounter.pokemon_species.name|capfirst }})
+                        <small class="text-muted">@ {{ encounter.route.name }}</small>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">Keine gefangenen Pokémon.</li>
+                {% endfor %}
+            </ul>
+
+            <h4 class="mb-2">Tot ({{ statuses.tot|length }})</h4>
+            <ul class="list-group">
+                 {% for encounter in statuses.tot %}
+                    <li class="list-group-item list-group-item-danger">
+                        {{ encounter.nickname|default:encounter.pokemon_species.name|capfirst }}
+                        ({{ encounter.pokemon_species.name|capfirst }})
+                        <small class="text-muted">@ {{ encounter.route.name }}</small>
+                    </li>
+                {% empty %}
+                     <li class="list-group-item">Keine verstorbenen Pokémon.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

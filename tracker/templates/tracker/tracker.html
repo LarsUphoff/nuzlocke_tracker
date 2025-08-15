@@ -1,0 +1,723 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between mb-3 align-items-center">
+    <div id="addRouteSection">
+        <button type="button" class="btn btn-outline-info rounded-pill" id="showAddRouteBtn">
+            <i class="bi bi-plus-circle me-1"></i> Route hinzufügen
+        </button>
+        <div id="addRouteForm" class="input-group mt-2" style="display: none;">
+            <input type="text" id="newRouteName" class="form-control" placeholder="Name der neuen Route">
+            <button type="button" class="btn btn-success" id="submitAddRouteBtn">Speichern</button>
+            <button type="button" class="btn btn-secondary" id="cancelAddRouteBtn">Abbrechen</button>
+        </div>
+    </div>
+    <div class="btn-group me-2" role="group">
+        <button type="button" class="btn btn-outline-secondary rounded-pill me-2" id="expandAllBtn">
+            <i class="bi bi-arrows-expand me-1"></i> Alle ausklappen
+        </button>
+        <button type="button" class="btn btn-outline-secondary rounded-pill me-2" id="collapseAllBtn">
+            <i class="bi bi-arrows-collapse me-1"></i> Alle einklappen
+        </button>
+    </div>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-outline-danger rounded-pill me-2" id="resetRunBtn">
+            <i class="bi bi-trash me-1"></i> Run zurücksetzen
+        </button>
+        <button type="button" class="btn btn-outline-primary rounded-pill me-2" id="exportRunBtn">
+            <i class="bi bi-download me-1"></i> Run exportieren
+        </button>
+        <button type="button" class="btn btn-outline-success rounded-pill" id="importRunBtn">
+            <i class="bi bi-upload me-1"></i> Run importieren
+        </button>
+        <input type="file" id="importRunFile" style="display: none;" accept="application/json">
+    </div>
+</div>
+
+<table class="table table-bordered table table-striped table-sm">
+    <thead>
+        <tr>
+            <th class="route-column">Route</th>
+            {% for player in players %}
+            <th>{{ player.name }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for route, player_map in encounter_map.items %}
+        <tr class="route-row" data-route-id="{{ route.id }}">
+            <td class="align-middle route-column">
+                <div class="route-cell-content">
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm route-collapse-toggle me-1" data-route-id="{{ route.id }}">
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                        <span class="route-name">{{ route.name }}</span>
+                    </div>
+                    <div class="dropdown route-actions">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="routeActions{{ route.id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="routeActions{{ route.id }}">
+                            <li><button class="dropdown-item reset-route-btn" data-route-id="{{ route.id }}">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Route zurücksetzen
+                            </button></li>
+                            <li><button class="dropdown-item kill-route-btn" data-route-id="{{ route.id }}">
+                                <i class="bi bi-emoji-neutral-fill me-1"></i> Alle auf Tot setzen
+                            </button></li>
+                            <li><button class="dropdown-item fail-route-btn" data-route-id="{{ route.id }}">
+                                <i class="fa-solid fa-poop me-1"></i> Alle auf Verkackt setzen
+                            </button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item delete-route-btn text-danger" data-route-id="{{ route.id }}">
+                                <i class="bi bi-trash me-1"></i> Route löschen
+                            </button></li>
+                        </ul>
+                    </div>
+                </div>
+            </td>
+            {% for player, encounter in player_map.items %}
+            <td>
+                <div class="route-content">
+                    <form method="post" action="{% url 'tracker_view' %}" class="encounter-form" data-player-id="{{ player.id }}" data-route-id="{{ route.id }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="player" value="{{ player.id }}">
+                        <input type="hidden" name="route" value="{{ route.id }}">
+                        <input type="hidden" name="action" value="save">
+                        {% with encounter_instance=encounter form=encounter_form %}
+                        <div>
+                            <input type="text"
+                                name="pokemon_name"
+                                class="pokemon-autocomplete form-control form-control-sm autosave-field"
+                                placeholder="Pokémon"
+                                value="{{ encounter_instance.pokemon_species.name|default:'' }}">
+                            <input type="hidden" name="pokemon_species" value="{{ encounter_instance.pokemon_species.id|default:'' }}">
+                        </div>
+                        <div>
+                            <input type="text" name="nickname"
+                                    class="form-control form-control-sm autosave-field nickname-input"
+                                    placeholder="Spitzname" value="{{ encounter_instance.nickname|default:'' }}">
+                        </div>
+                        <div class="input-group input-group-sm status-input-group">
+                            <span class="input-group-text status-icon">
+                                <i class="{% if encounter_instance and encounter_instance.status == 'gefangen' %}bi bi-check-circle-fill text-success
+                                        {% elif encounter_instance and encounter_instance.status == 'tot' %}bi bi-emoji-neutral-fill text-danger
+                                        {% elif encounter_instance and encounter_instance.status == 'verkackt' %}fa-solid fa-poop text-brown
+                                        {% else %}bi bi-dash-circle-fill text-secondary
+                                        {% endif %}"></i>
+                            </span>
+                            <select name="status"
+                                    class="form-select form-select-sm autosave-field">
+                                {% for value, display in form.fields.status.choices %}
+                                <option value="{{ value }}" {% if encounter_instance and encounter_instance.status == value %}selected{% elif not encounter_instance and value == '-' %}selected{% endif %}>
+                                    {{ display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-sm reset-encounter-btn" title="Encounter zurücksetzen"
+                                    data-player-id="{{ player.id }}" data-route-id="{{ route.id }}">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        {% endwith %}
+                    </form>
+                </div>
+                <div class="route-collapsed d-none">
+                    <span class="nickname-collapsed">{{ encounter.nickname|default:'' }}</span>
+                    {% if encounter and encounter.status != '-' %}
+                    <span class="status-indicator ms-1">
+                        <i class="{% if encounter.status == 'gefangen' %}bi bi-check-circle-fill text-success
+                                 {% elif encounter.status == 'tot' %}bi bi-emoji-neutral-fill text-danger
+                                 {% elif encounter.status == 'verkackt' %}fa-solid fa-poop text-brown
+                                 {% endif %} small"></i>
+                    </span>
+                    {% endif %}
+                </div>
+            </td>
+            {% endfor %}
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="{{ players|length|add:1 }}" class="text-center">Noch keine Routen oder Spieler angelegt.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(function() {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function saveCollapseState(routeId, isCollapsed) {
+        let collapseStates = JSON.parse(localStorage.getItem('routeCollapseStates') || '{}');
+        collapseStates[routeId] = isCollapsed;
+        localStorage.setItem('routeCollapseStates', JSON.stringify(collapseStates));
+    }
+
+    function getCollapseState(routeId) {
+        let collapseStates = JSON.parse(localStorage.getItem('routeCollapseStates') || '{}');
+        return collapseStates[routeId] || false;
+    }
+
+    function toggleRouteCollapse($row, routeId, forceState = null) {
+        const isCollapsed = forceState !== null ? forceState : !$row.hasClass('collapsed-row');
+        
+        if (isCollapsed) {
+            $row.addClass('collapsed-row');
+            $row.find('.route-content').addClass('d-none');
+            $row.find('.route-collapsed').removeClass('d-none');
+            $row.find('.route-collapse-toggle i').removeClass('bi-chevron-down').addClass('bi-chevron-right');
+        } else {
+            $row.removeClass('collapsed-row');
+            $row.find('.route-content').removeClass('d-none');
+            $row.find('.route-collapsed').addClass('d-none');
+            $row.find('.route-collapse-toggle i').removeClass('bi-chevron-right').addClass('bi-chevron-down');
+        }
+        
+        saveCollapseState(routeId, isCollapsed);
+    }
+
+    $('.route-row').each(function() {
+        const routeId = $(this).data('route-id');
+        const isCollapsed = getCollapseState(routeId);
+        if (isCollapsed) {
+            toggleRouteCollapse($(this), routeId, true);
+        }
+    });
+
+    $(document).on('click', '.route-collapse-toggle', function() {
+        const $row = $(this).closest('.route-row');
+        const routeId = $row.data('route-id');
+        toggleRouteCollapse($row, routeId);
+    });
+
+    $('#expandAllBtn').click(function() {
+        $('.route-row').each(function() {
+            const routeId = $(this).data('route-id');
+            toggleRouteCollapse($(this), routeId, false);
+        });
+    });
+
+    $('#collapseAllBtn').click(function() {
+        $('.route-row').each(function() {
+            const routeId = $(this).data('route-id');
+            toggleRouteCollapse($(this), routeId, true);
+        });
+    });
+
+    $(document).on('click', '.reset-encounter-btn', function() {
+        const $btn = $(this);
+        const playerId = $btn.data('player-id');
+        const routeId = $btn.data('route-id');
+        
+        if (confirm('Soll der Eintrag wirklich zurückgesetzt werden?')) {
+            $.ajax({
+                url: "{% url 'tracker_view' %}",
+                type: 'POST',
+                data: {
+                    'action': 'reset',
+                    'player': playerId,
+                    'route': routeId,
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'reset_success') {
+                        const $form = $btn.closest('form');
+                        $form.find('input[name="pokemon_name"]').val('');
+                        $form.find('input[name="nickname"]').val('');
+                        $form.find('input[name="pokemon_species"]').val('');
+                        const $statusSelect = $form.find('select[name="status"]');
+                        $statusSelect.val(response.new_status || '-'); 
+                        updateStatusIcon($statusSelect);
+                        updateRouteStatusBorders();
+                    } else {
+                        console.error("Reset error:", response.message || "Unknown error");
+                        alert("Fehler beim Zurücksetzen des Encounters.");
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX error:", status, error);
+                    alert("Fehler beim Zurücksetzen des Encounters.");
+                }
+            });
+        }
+    });
+
+    function updateStatusIcon($select) {
+        const status = $select.val();
+        const $icon = $select.closest('.input-group').find('.status-icon i');
+        
+        let textClass = '';
+        if ($icon.hasClass('text-success')) textClass = 'text-success';
+        else if ($icon.hasClass('text-danger')) textClass = 'text-danger';
+        else if ($icon.hasClass('text-brown')) textClass = 'text-brown';
+        else if ($icon.hasClass('text-secondary')) textClass = 'text-secondary';
+        
+        $icon.attr('class', '');
+        
+        if (status === 'gefangen') {
+            $icon.addClass('bi bi-check-circle-fill text-success');
+        } else if (status === 'tot') {
+            $icon.addClass('bi bi-emoji-neutral-fill text-danger');
+        } else if (status === 'verkackt') {
+            $icon.addClass('fa-solid fa-poop text-brown');
+        } else {
+            $icon.addClass('bi bi-dash-circle-fill text-secondary');
+        }
+    }
+    
+    $('select[name="status"]').on('change', function() {
+        updateStatusIcon($(this));
+        updateRouteStatusBorders();
+        
+        const $form = $(this).closest('form');
+        const $cell = $form.closest('td');
+        const status = $(this).val();
+        const $collapsedStatusIcon = $cell.find('.route-collapsed .status-indicator i');
+        
+        $collapsedStatusIcon.removeClass('bi-check-circle-fill text-success bi-emoji-neutral-fill text-danger fa-solid fa-poop text-brown bi-dash-circle-fill text-secondary');
+        
+        if (status === 'gefangen') {
+            $collapsedStatusIcon.addClass('bi bi-check-circle-fill text-success');
+        } else if (status === 'tot') {
+            $collapsedStatusIcon.addClass('bi bi-emoji-neutral-fill text-danger');
+        } else if (status === 'verkackt') {
+            $collapsedStatusIcon.addClass('fa-solid fa-poop text-brown');
+        } else {
+            $collapsedStatusIcon.addClass('bi bi-dash-circle-fill text-secondary');
+        }
+    });
+    
+     $(".pokemon-autocomplete").on("change", function() {
+        var $input = $(this);
+        var $form = $input.closest('form');
+        var $speciesField = $form.find('input[name="pokemon_species"]');
+        if ($input.val() === '') {
+            $speciesField.val('');
+        }
+    });
+     $(".pokemon-autocomplete").each(function() {
+        var $input = $(this);
+        var $form = $input.closest('form');
+        var $speciesField = $form.find('input[name="pokemon_species"]');
+
+        $input.autocomplete({
+            source: "{% url 'pokemon_autocomplete' %}",
+            minLength: 2,
+            select: function(event, ui) {
+                $input.val(ui.item.label || ui.item.value);
+                $input.trigger('change');
+                return false;
+            },
+            change: function(event, ui) {
+               if (!ui.item) {
+                   if ($input.val() === '') {
+                       $speciesField.val('');
+                   }
+               }
+               $input.trigger('change');
+            }
+        });
+    });
+
+    let saveTimeout;
+    $('.autosave-field').on('change blur', function(event) {
+        if (event.type === 'blur' && $(this).data('justChanged')) {
+            $(this).data('justChanged', false);
+            return;
+        }
+        if (event.type === 'change') {
+            $(this).data('justChanged', true);
+        }
+
+        clearTimeout(saveTimeout);
+        var $field = $(this);
+        var $form = $field.closest('form');
+
+        if ($field.hasClass('nickname-input')) {
+            const $cell = $form.closest('td');
+            $cell.find('.nickname-collapsed').text($field.val() || '');
+        }
+
+        saveTimeout = setTimeout(function() {
+            var formData = $form.serialize();
+
+            $.ajax({
+                url: "{% url 'tracker_view' %}",
+                type: 'POST',
+                data: formData,
+                headers: {'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        if(response.pokemon_species_id !== undefined) {
+                            $form.find('input[name="pokemon_species"]').val(response.pokemon_species_id);
+                        }
+                        if(response.status_value !== undefined) {
+                             const $statusSelect = $form.find('select[name="status"]');
+                             if ($statusSelect.val() !== response.status_value) {
+                                 $statusSelect.val(response.status_value);
+                             }
+                             updateStatusIcon($statusSelect);
+                        }
+                        updateRouteStatusBorders();
+                    } else if (response.status === 'error') {
+                        console.error("Save error:", response.errors);
+                    } else if (response.status === 'reset_success') {
+                         $form.find('input[name="pokemon_name"]').val('');
+                         $form.find('input[name="nickname"]').val('');
+                         $form.find('input[name="pokemon_species"]').val('');
+                         const $statusSelect = $form.find('select[name="status"]');
+                         $statusSelect.val(response.new_status || '-');
+                         updateStatusIcon($statusSelect);
+                         updateRouteStatusBorders();
+                         
+                         const $cell = $form.closest('td');
+                         $cell.find('.nickname-collapsed').text('');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX error:", status, error);
+                }
+            });
+        }, 500);
+    });
+
+    function handleRouteAction(button, action, confirmMessage) {
+        const routeId = $(button).data('route-id');
+        if (!routeId) {
+            console.error("Route ID not found on button.");
+            return;
+        }
+
+        if (action === 'delete_route') {
+                $.ajax({
+                    url: "{% url 'tracker_view' %}",
+                    type: 'POST',
+                    data: {
+                        'action': action,
+                        'route': routeId,
+                        'csrfmiddlewaretoken': csrftoken
+                    },
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            console.log(action + " successful for route " + routeId);
+                            $(button).closest('tr').fadeOut(300, function() { $(this).remove(); });
+                        } else {
+                            console.error(action + " error:", response.message || "Unknown error");
+                            alert("Fehler: " + (response.message || "Unbekannter Fehler"));
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("AJAX error for " + action + ":", status, error);
+                        alert("AJAX Fehler beim Ausführen der Aktion.");
+                    }
+                });
+            return;
+        }
+
+            $.ajax({
+                url: "{% url 'tracker_view' %}",
+                type: 'POST',
+                data: {
+                    'action': action,
+                    'route': routeId,
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        console.log(action + " successful for route " + routeId);
+                        const $row = $(button).closest('tr');
+                        if (action === 'reset_route') {
+                            $row.find('.encounter-form').each(function() {
+                                $(this).find('input[name="pokemon_name"]').val('');
+                                $(this).find('input[name="nickname"]').val('');
+                                $(this).find('input[name="pokemon_species"]').val('');
+                                const $statusSelect = $(this).find('select[name="status"]');
+                                $statusSelect.val('-');
+                                updateStatusIcon($statusSelect);
+                            });
+                            $row.find('.nickname-collapsed').text('');
+                        } else if (action === 'kill_route') {
+                            $row.find('.encounter-form').each(function() {
+                                const pokemonName = $(this).find('input[name="pokemon_name"]').val();
+                                const currentStatus = $(this).find('select[name="status"]').val();
+                                if (pokemonName || currentStatus === 'verkackt') { 
+                                     const $statusSelect = $(this).find('select[name="status"]');
+                                     $statusSelect.val('tot');
+                                     updateStatusIcon($statusSelect);
+                                }
+                             });
+                        } else if (action === 'fail_route') {
+                            $row.find('.encounter-form').each(function() {
+                                 const $statusSelect = $(this).find('select[name="status"]');
+                                 $statusSelect.val('verkackt');
+                                 updateStatusIcon($statusSelect);
+                             });
+                        }
+                        updateRouteStatusBorders();
+                    } else {
+                        console.error(action + " error:", response.message || "Unknown error");
+                        alert("Fehler: " + (response.message || "Unbekannter Fehler"));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX error for " + action + ":", status, error);
+                    alert("AJAX Fehler beim Ausführen der Aktion.");
+                }
+            });
+    }
+
+    function updateRouteStatusBorders() {
+        $('table tbody tr').each(function() {
+            const $row = $(this);
+            const $routeCell = $row.find('td:first-child');
+            const $forms = $row.find('.encounter-form');
+            
+            if ($forms.length === 0) {
+                return;
+            }
+            
+            let firstStatus = null;
+            let allSameStatus = true;
+            let hasNonDefault = false;
+            
+            $forms.each(function() {
+                const status = $(this).find('select[name="status"]').val();
+                
+                if (status !== '-') {
+                    hasNonDefault = true;
+                    if (firstStatus === null) {
+                        firstStatus = status;
+                    } else if (status !== firstStatus) {
+                        allSameStatus = false;
+                    }
+                } else {
+                    allSameStatus = false;
+                }
+            });
+            
+            $routeCell.removeClass('route-all-dead route-all-caught route-all-failed'); 
+            
+            if (hasNonDefault && allSameStatus) {
+                if (firstStatus === 'tot') {
+                    $routeCell.addClass('route-all-dead');
+                } else if (firstStatus === 'gefangen') {
+                    $routeCell.addClass('route-all-caught');
+                } else if (firstStatus === 'verkackt') {
+                    $routeCell.addClass('route-all-failed'); 
+                }
+            }
+        });
+    }
+    
+    updateRouteStatusBorders();
+    
+    $(document).on('click', '.reset-route-btn', function() {
+        const routeName = $(this).closest('tr').find('.route-name').text();
+        handleRouteAction(this, 'reset_route', `Sollen wirklich ALLE Einträge für Route "${routeName}" zurückgesetzt werden?`);
+    });
+
+    $(document).on('click', '.kill-route-btn', function() {
+        const routeName = $(this).closest('tr').find('.route-name').text();
+        handleRouteAction(this, 'kill_route', `Sollen wirklich ALLE Pokémon auf Route "${routeName}" auf 'Tot' gesetzt werden?`);
+    });
+
+    $(document).on('click', '.fail-route-btn', function() {
+        const routeName = $(this).closest('tr').find('.route-name').text();
+        handleRouteAction(this, 'fail_route', `Sollen wirklich ALLE Einträge für Route "${routeName}" auf 'Verkackt' gesetzt werden?`);
+    });
+
+    $(document).on('click', '.delete-route-btn', function() {
+        const routeName = $(this).closest('tr').find('.route-name').text();
+        handleRouteAction(this, 'delete_route', `Soll die Route "${routeName}" wirklich endgültig gelöscht werden? Alle zugehörigen Einträge gehen verloren!`);
+    });
+
+    $('#resetRunBtn').click(function() {
+        if (confirm('Willst du den gesamten Run zurücksetzen? Alle Encounter werden gelöscht!')) {
+            $.ajax({
+                url: "{% url 'tracker_view' %}",
+                type: 'POST',
+                data: {
+                    'action': 'reset_run',
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        alert('Der Run wurde erfolgreich zurückgesetzt.');
+                        location.reload();
+                    } else {
+                        alert('Fehler: ' + (response.message || 'Unbekannter Fehler beim Zurücksetzen'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX error:', status, error);
+                    alert('Fehler beim Zurücksetzen des Runs.');
+                }
+            });
+        }
+    });
+    
+    $('#exportRunBtn').click(function() {
+        $.ajax({
+            url: "{% url 'tracker_view' %}",
+            type: 'POST',
+            data: {
+                'action': 'export_run',
+                'csrfmiddlewaretoken': csrftoken
+            },
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success' && response.data) {
+                    const dataStr = JSON.stringify(response.data, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = URL.createObjectURL(dataBlob);
+                    const now = new Date();
+                    const dateStr = now.toISOString().slice(0,10);
+                    downloadLink.download = `nuzlocke_run_${dateStr}.json`;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                } else {
+                    alert('Fehler: ' + (response.message || 'Keine Daten zum Exportieren verfügbar'));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', status, error);
+                alert('Fehler beim Exportieren des Runs.');
+            }
+        });
+    });
+    
+    $('#importRunBtn').click(function() {
+        $('#importRunFile').click();
+    });
+    
+    $('#importRunFile').change(function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        if (confirm(`Willst du wirklich "${file.name}" importieren? Bestehende Daten können überschrieben werden.`)) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const importData = JSON.parse(e.target.result);
+                    
+                    $.ajax({
+                        url: "{% url 'tracker_view' %}",
+                        type: 'POST',
+                        data: {
+                            'action': 'import_run',
+                            'import_data': JSON.stringify(importData),
+                            'csrfmiddlewaretoken': csrftoken
+                        },
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.status === 'success') {
+                                alert('Run wurde erfolgreich importiert!');
+                                location.reload();
+                            } else {
+                                alert('Fehler: ' + (response.message || 'Import fehlgeschlagen'));
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('AJAX error:', status, error);
+                            alert('Fehler beim Importieren des Runs.');
+                        }
+                    });
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    alert('Ungültiges Dateiformat. Die Datei muss ein gültiges JSON-Format haben.');
+                }
+                
+                $('#importRunFile').val('');
+            };
+            
+            reader.readAsText(file);
+        } else {
+            $('#importRunFile').val('');
+        }
+    });
+
+    $('#showAddRouteBtn').click(function() {
+        $(this).hide();
+        $('#addRouteForm').show();
+        $('#newRouteName').focus();
+    });
+
+    $('#cancelAddRouteBtn').click(function() {
+        $('#addRouteForm').hide();
+        $('#newRouteName').val('');
+        $('#showAddRouteBtn').show();
+    });
+
+    $('#submitAddRouteBtn').click(function() {
+        const newRouteName = $('#newRouteName').val().trim();
+        if (!newRouteName) {
+            alert('Bitte einen Namen für die neue Route eingeben.');
+            return;
+        }
+
+        $.ajax({
+            url: "{% url 'tracker_view' %}",
+            type: 'POST',
+            data: {
+                'action': 'add_route',
+                'route_name': newRouteName,
+                'csrfmiddlewaretoken': csrftoken
+            },
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Fehler: ' + (response.message || 'Route konnte nicht hinzugefügt werden. Existiert sie bereits?'));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', status, error);
+                alert('Fehler beim Hinzufügen der Route.');
+            }
+        });
+    });
+
+    $('#newRouteName').keypress(function(event) {
+        if (event.which == 13) {
+            event.preventDefault();
+            $('#submitAddRouteBtn').click();
+        }
+    });
+
+});
+</script>
+{% endblock %}

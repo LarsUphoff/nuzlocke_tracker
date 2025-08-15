@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuzlocke Tracker</title>
+    <link rel="icon" type="image/x-icon" href="{% load static %}{% static 'tracker/favicon.ico' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body { padding-top: 70px; }
+        .nav-tabs .nav-link.active { font-weight: bold; }
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+        }
+        .navbar-logo {
+            width: 32px;
+            height: 32px;
+            margin-right: 8px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .status-icon-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            padding: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+            z-index: 2;
+        }
+        .status-icon {
+            font-size: 1rem;
+        }
+        @media (max-width: 992px) {
+            .status-text {
+                display: none;
+            }
+            .status-icon-container {
+                width: 100%;
+                justify-content: center;
+            }
+            .status-icon {
+                margin-right: 0;
+            }
+        }
+        .status-select {
+            color: transparent;
+            position: relative;
+            z-index: 1;
+        }
+        .status-select:focus {
+            color: inherit;
+        }
+        .route-column {
+            width: 240px;
+            max-width: 240px;
+        }
+        .route-cell-content {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 2px 0;
+        }
+        .route-name {
+            font-weight: 500;
+            max-width: 160px;
+            word-wrap: break-word;
+            hyphens: auto;
+            padding-right: 5px;
+        }
+        .route-actions {
+            white-space: nowrap;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+        .route-actions .btn {
+            margin: 0 1px;
+            padding: 2px 6px;
+        }
+        .encounter-form {
+            padding: 6px 2px;
+            margin-bottom: 0;
+        }
+        .encounter-form .form-control-sm,
+        .encounter-form .form-select-sm {
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+        }
+        .status-input-group .status-icon {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            border-right: 0;
+        }
+        .status-input-group .form-select-sm {
+           padding-left: 0.5rem;
+        }
+        .btn-danger .bi,
+        .btn-warning .bi {
+            color: #fff;
+        }
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        .input-group-sm > .form-select-sm,
+        .input-group-sm > .btn-sm,
+        .input-group-sm > .input-group-text {
+            height: calc(1.5em + 0.5rem + 2px);
+            line-height: 1.5;
+            white-space: nowrap;
+            font-size: 0.875rem;
+        }
+        .input-group-text {
+            border-radius: .2rem 0 0 .2rem;
+            display: flex;
+            align-items: center;
+        }
+        .status-input-group .btn-outline-secondary {
+             border-left: 0;
+             border-top-left-radius: 0;
+             border-bottom-left-radius: 0;
+        }
+        .btn-outline-danger.input-group-text {
+            border-left: 0;
+        }
+        .btn-outline-danger .bi,
+        .btn-danger .bi,
+        .btn-warning .bi {
+            color: #fff !important;
+        }
+        .btn-outline-danger .bi {
+            color: #dc3545 !important;
+        }
+        .reset-encounter-btn {
+            border-left: 0;
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            width: 40px;
+            min-width: 40px;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            background-color: #f8f9fa;
+            border-color: #ced4da;
+            color: #6c757d;
+            flex: 0 0 auto;
+            display: flex;
+            justify-content: center;
+        }
+        .status-input-group .form-select {
+            border-right: 0;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        .route-all-dead {
+            border-left: 5px solid #dc3545 !important;
+        }
+        .route-all-caught {
+            border-left: 5px solid #198754 !important;
+        }
+        .route-all-failed {
+            border-left: 5px solid #a5673f !important;
+        }
+        .nickname-input {
+            font-weight: bold;
+        }
+        .text-brown {
+            color: #a5673f !important;
+        }
+        .status-icon .fa-solid, .status-icon .fa-poop {
+             font-size: 1rem;
+             vertical-align: text-bottom;
+        }
+        .route-collapse-toggle {
+            padding: 0.15rem 0.4rem;
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+        }
+        .route-collapse-toggle:hover {
+            background-color: rgba(0,0,0,0.05);
+            color: #212529;
+        }
+        .collapsed-row {
+            background-color: #f8f9fa;
+        }
+        .collapsed-row.table-active {
+            background-color: rgba(0,0,0,0.075) !important;
+        }
+        .nickname-collapsed {
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        .route-collapsed {
+            padding: 0.25rem 0;
+            display: flex;
+            align-items: center;
+        }
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+        }
+        .status-indicator i {
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                {% load static %}
+                Nuzlocke Tracker
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'tracker' %}active{% endif %}" href="{% url 'tracker_view' %}">Tracker</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'bosse' %}active{% endif %}" href="{% url 'boss_view' %}">Bosse</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'schwaechen' %}active{% endif %}" href="{% url 'strength_weakness_view' %}">Schwächen</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'regeln' %}active{% endif %}" href="{% url 'rules_view' %}">Regeln</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'typen' %}active{% endif %}" href="{% url 'player_types_view' %}">Typen</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'rad' %}active{% endif %}" href="{% url 'type_wheel_view' %}">Glücksrad</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        {% block content %}
+        {% endblock %}
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}
+    {% endblock %}
+    <script>
+        $(function() {
+            $(".pokemon-autocomplete").each(function() {
+                var $input = $(this);
+                var $speciesField = $input.closest('form').find('input[name="pokemon_species"]');
+                $input.autocomplete({
+                    source: "{% url 'pokemon_autocomplete' %}",
+                    minLength: 2,
+                    select: function(event, ui) {
+                        $input.val(ui.item.label || ui.item.value);
+                        return false;
+                    },
+                    change: function(event, ui) {
+                       if (!ui.item) {
+                       }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+{% extends 'tracker/base.html' %}
+{% load tracker_extras %}
+
+{% block content %}
+<div class="container py-4">
+
+    <h2 class="mb-4">Pokémon-Schwächen</h2>
+
+    <form method="get" action="{% url 'strength_weakness_view' %}" class="mb-4">
+        <div class="input-group input-group-lg">
+            <input type="text"
+                   name="pokemon_name"
+                   class="form-control pokemon-autocomplete"
+                   placeholder="Pokémon eingeben..."
+                   value="{{ pokemon_name|default:'' }}">
+            <button type="submit" class="btn btn-primary">Suchen</button>
+        </div>
+    </form>
+
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    {% if pokemon_info or sprite_url %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body d-flex align-items-center">
+                {% if sprite_url %}
+                    <img src="{{ sprite_url }}" alt="{{ display_name }}" class="me-4"
+                         style="width: 96px; height: 96px; image-rendering: pixelated;">
+                {% endif %}
+                <div>
+                    <h3 class="card-title mb-2">{{ display_name|capfirst }}</h3>
+                    {% if pokemon_info.pokemon_types %}
+                        <div>
+                            {% for type in pokemon_info.pokemon_types %}
+                                <span class="badge rounded-pill me-2 mb-1"
+                                      style="background-color: {{ type_colors_de|get_item:type }}; color: #fff; text-shadow: 1px 1px 1px #000;">
+                                    {{ type }}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if pokemon_info.effectiveness %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm text-center mb-0" style="table-layout: fixed;">
+                            <thead class="table-light">
+                                <tr>
+                                    {% for multiplier in multiplier_order %}
+                                        <th class="align-middle">
+                                            {% if multiplier == "0.5" %}½×
+                                            {% elif multiplier == "0.25" %}¼×
+                                            {% else %}{{ multiplier }}×
+                                            {% endif %}
+                                        </th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    {% for multiplier in multiplier_order %}
+                                        <td class="align-top">
+                                            {% with types=pokemon_info.effectiveness|get_item:multiplier %}
+                                                {% if types %}
+                                                    {% for type in types %}
+                                                        <span class="badge rounded-pill mb-1"
+                                                              style="background-color: {{ type_colors_de|get_item:type }}; color: #fff; text-shadow: 1px 1px 1px #000;">
+                                                            {{ type }}
+                                                        </span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">–</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-muted small">
+                    Der Schadensfaktor gilt, wenn das Pokémon von Attacken des jeweiligen Typs getroffen wird.
+                </div>
+            </div>
+        {% else %}
+            <p class="text-muted">Effektivitätsdaten konnten nicht geladen werden.</p>
+        {% endif %}
+    {% elif pokemon_name and not error %}
+        <p class="text-muted">Keine Daten gefunden für <strong>{{ display_name }}</strong>.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# Kein extra JS benötigt #}
+{% endblock %}
