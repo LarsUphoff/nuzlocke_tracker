@@ -285,13 +285,8 @@ $(function() {
         }
     }
     
-    $('select[name="status"]').on('change', function() {
-        updateStatusIcon($(this));
-        updateRouteStatusBorders();
-        
-        const $form = $(this).closest('form');
+    function updateCollapsedStatusIcon($form, status) {
         const $cell = $form.closest('td');
-        const status = $(this).val();
         const $collapsedStatusIcon = $cell.find('.route-collapsed .status-indicator i');
         
         $collapsedStatusIcon.removeClass('bi-check-circle-fill text-success bi-emoji-neutral-fill text-danger fa-solid fa-poop text-brown bi-dash-circle-fill text-secondary');
@@ -305,6 +300,27 @@ $(function() {
         } else {
             $collapsedStatusIcon.addClass('bi bi-dash-circle-fill text-secondary');
         }
+    }
+
+    $('select[name="status"]').on('change', function() {
+        updateStatusIcon($(this));
+        updateRouteStatusBorders();
+        
+        const $form = $(this).closest('form');
+        const status = $(this).val();
+        
+        // Clear Pokemon data when status is set to "verkackt"
+        if (status === 'verkackt') {
+            $form.find('input[name="pokemon_name"]').val('');
+            $form.find('input[name="pokemon_species"]').val('');
+            $form.find('input[name="nickname"]').val('');
+            
+            // Update collapsed view
+            const $cell = $form.closest('td');
+            $cell.find('.nickname-collapsed').text('');
+        }
+        
+        updateCollapsedStatusIcon($form, status);
     });
     
      $(".pokemon-autocomplete").on("change", function() {
@@ -378,6 +394,7 @@ $(function() {
                                  $statusSelect.val(response.status_value);
                              }
                              updateStatusIcon($statusSelect);
+                             updateCollapsedStatusIcon($form, response.status_value);
                         }
                         updateRouteStatusBorders();
                     } else if (response.status === 'error') {
@@ -389,6 +406,7 @@ $(function() {
                          const $statusSelect = $form.find('select[name="status"]');
                          $statusSelect.val(response.new_status || '-');
                          updateStatusIcon($statusSelect);
+                         updateCollapsedStatusIcon($form, response.new_status || '-');
                          updateRouteStatusBorders();
                          
                          const $cell = $form.closest('td');
@@ -459,6 +477,7 @@ $(function() {
                                 const $statusSelect = $(this).find('select[name="status"]');
                                 $statusSelect.val('-');
                                 updateStatusIcon($statusSelect);
+                                updateCollapsedStatusIcon($(this), '-');
                             });
                             $row.find('.nickname-collapsed').text('');
                         } else if (action === 'kill_route') {
@@ -469,14 +488,23 @@ $(function() {
                                      const $statusSelect = $(this).find('select[name="status"]');
                                      $statusSelect.val('tot');
                                      updateStatusIcon($statusSelect);
+                                     updateCollapsedStatusIcon($(this), 'tot');
                                 }
                              });
                         } else if (action === 'fail_route') {
                             $row.find('.encounter-form').each(function() {
+                                 // Clear all Pokemon data when failing route
+                                 $(this).find('input[name="pokemon_name"]').val('');
+                                 $(this).find('input[name="pokemon_species"]').val('');
+                                 $(this).find('input[name="nickname"]').val('');
+                                 
                                  const $statusSelect = $(this).find('select[name="status"]');
                                  $statusSelect.val('verkackt');
                                  updateStatusIcon($statusSelect);
+                                 updateCollapsedStatusIcon($(this), 'verkackt');
                              });
+                             // Clear collapsed nicknames
+                             $row.find('.nickname-collapsed').text('');
                         }
                         updateRouteStatusBorders();
                     } else {

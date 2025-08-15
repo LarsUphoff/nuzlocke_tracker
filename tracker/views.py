@@ -593,11 +593,10 @@ def tracker_view(request):
             form = EncounterForm(request.POST, instance=instance)
             if form.is_valid():
                 try:
-                    if form.cleaned_data["status"] in [
-                        "-",
-                        "verkackt",
-                    ] and not form.cleaned_data.get("pokemon_species"):
+                    # Clear Pokemon data when status is verkackt or -
+                    if form.cleaned_data["status"] in ["-", "verkackt"]:
                         form.instance.pokemon_species = None
+                        form.instance.nickname = ""
 
                     saved_instance = form.save()
                     if is_ajax:
@@ -1136,4 +1135,5 @@ def type_wheel_view(request):
         "all_type_colors_de": all_type_colors_de,
         "active_tab": "rad",
     }
+    return render(request, "tracker/type_wheel.html", context)
     return render(request, "tracker/type_wheel.html", context)
