@@ -292,11 +292,12 @@ def tracker_view(request):
                     deleted_routes_count, _ = Route.objects.filter(
                         order__lt=-1
                     ).delete()
+                    deleted_types_count, _ = PlayerType.objects.all().delete()
 
                     return JsonResponse(
                         {
                             "status": "success",
-                            "message": f"{deleted_encounters_count} Encounter und {deleted_routes_count} benutzerdefinierte Routen wurden zurückgesetzt.",
+                            "message": f"{deleted_encounters_count} Encounter, {deleted_routes_count} benutzerdefinierte Routen und {deleted_types_count} Typenzuweisungen wurden zurückgesetzt.",
                         }
                     )
             except Exception as e:

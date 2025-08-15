@@ -585,7 +585,7 @@ $(function() {
     });
 
     $('#resetRunBtn').click(function() {
-        if (confirm('Willst du den gesamten Run zurücksetzen? Alle Encounter werden gelöscht!')) {
+        if (confirm('Willst du den gesamten Run zurücksetzen? Alle Encounter und Typenzuweisungen werden gelöscht!')) {
             $.ajax({
                 url: "{% url 'tracker_view' %}",
                 type: 'POST',
