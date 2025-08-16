@@ -109,7 +109,7 @@ python manage.py populate_routes
 ### 9. Entwicklungsserver starten
 
 ```bash
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8000
 ```
 
 Die Anwendung ist unter `http://127.0.0.1:8000/` erreichbar.
